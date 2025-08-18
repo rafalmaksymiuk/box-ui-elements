@@ -44,6 +44,8 @@ import type {
     InternalSidebarNavigationHandler,
     SidebarNavigation,
     SidebarNavigationHandler,
+    ViewType,
+    FeedEntryType,
 } from '../common/types/SidebarNavigation';
 
 type Props = {
@@ -120,7 +122,7 @@ class SidebarRouterDisabled extends React.Component<Props, State> {
         super(props);
 
         this.state = {
-            isDirty: this.getLocationState('open') || false,
+            isDirty: false,
             internalSidebarNavigation: {},
         };
 
@@ -143,8 +145,8 @@ class SidebarRouterDisabled extends React.Component<Props, State> {
     }
 
     componentDidUpdate(prevProps: Props): void {
-        const { fileId, history, location, onOpenChange = noop, sidebarNavigation }: Props = this.props;
-        const { fileId: prevFileId, location: prevLocation, sidebarNavigation: prevSidebarNavigation }: Props = prevProps;
+        const { fileId, onOpenChange = noop, sidebarNavigation }: Props = this.props;
+        const { fileId: prevFileId, sidebarNavigation: prevSidebarNavigation }: Props = prevProps;
         const { isDirty }: State = this.state;
 
         // If sidebarNavigation prop changed, update internal state
@@ -153,17 +155,20 @@ class SidebarRouterDisabled extends React.Component<Props, State> {
         }
 
         // User navigated to a different file without ever navigating the sidebar
-        if (!isDirty && fileId !== prevFileId && location.pathname !== '/') {
-            history.replace({ pathname: '/', state: { silent: true } });
+        if (!isDirty && fileId !== prevFileId && this.state.internalSidebarNavigation.sidebar) {
+            this.internalSidebarNavigationHandler({ silent: true });
         }
 
         // User navigated or toggled the sidebar intentionally, internally or externally
-        if (location !== prevLocation && !this.getLocationState('silent')) {
+        const prevInternalNavigation = prevSidebarNavigation || {};
+        const currentInternalNavigation = this.state.internalSidebarNavigation;
+        if (!isEqual(currentInternalNavigation, prevInternalNavigation) && !currentInternalNavigation.silent) {
             this.setForcedByLocation();
             this.setState({ isDirty: true });
-            const openState = this.getLocationState('open');
+            const openState = currentInternalNavigation.open;
+            const prevOpenState = prevInternalNavigation.open;
             // Check if the sidebar was expanded / collapsed
-            if (prevLocation.state?.open !== openState) {
+            if (prevOpenState !== openState) {
                 onOpenChange(openState, false);
             }
         }
@@ -187,7 +192,7 @@ class SidebarRouterDisabled extends React.Component<Props, State> {
     };
 
     handleDocgenTemplateOnUpdate = (prevProps: Props) => {
-        const { history, location, file, api, metadataSidebarProps, docGenSidebarProps } = this.props;
+        const { file, api, metadataSidebarProps, docGenSidebarProps } = this.props;
         const { file: prevFile, docGenSidebarProps: prevDocGenSidebarProps }: Props = prevProps;
         // need to re-check if file is a docgen-template on file change
         if (file.id !== prevFile.id && docGenSidebarProps.enabled && docGenSidebarProps.checkDocGenTemplate) {
@@ -200,17 +205,14 @@ class SidebarRouterDisabled extends React.Component<Props, State> {
         ) {
             if (docGenSidebarProps.isDocGenTemplate) {
                 // navigate to docgen tab
-                history.push(`/${SIDEBAR_VIEW_DOCGEN}`);
-            } else if (location.pathname === `/${SIDEBAR_VIEW_DOCGEN}`) {
-                history.push('/');
+                this.internalSidebarNavigationHandler({ sidebar: ViewType.DOCGEN });
+            } else if (this.state.internalSidebarNavigation.sidebar === ViewType.DOCGEN) {
+                this.internalSidebarNavigationHandler({});
             }
         }
     };
 
-    getUrlPrefix = (pathname: string) => {
-        const basePath = pathname.substring(1).split('/')[0];
-        return basePath;
-    };
+
 
     /**
      * Handle version history click
@@ -219,34 +221,20 @@ class SidebarRouterDisabled extends React.Component<Props, State> {
      * @return {void}
      */
     handleVersionHistoryClick = (event: SyntheticEvent<>): void => {
-        const { file, history } = this.props;
+        const { file } = this.props;
         const { file_version: currentVersion } = file;
-        const fileVersionSlug = currentVersion ? `/${currentVersion.id}` : '';
-
-        const urlPrefix = this.getUrlPrefix(history.location.pathname);
 
         if (event.preventDefault) {
             event.preventDefault();
         }
 
-        history.push(`/${urlPrefix}/versions${fileVersionSlug}`);
+        // Navigate to versions view while preserving current sidebar context
+        this.internalSidebarNavigationHandler({
+            sidebar: this.state.internalSidebarNavigation.sidebar,
+            activeFeedEntryType: FeedEntryType.VERSIONS,
+            ...(currentVersion?.id && { versionId: currentVersion.id }),
+        });
     };
-
-    /**
-     * Getter for location state properties.
-     *
-     * NOTE: Each location on the history stack has its own optional state object that is wholly separate from
-     * this component's internal state. Values on the location state object can persist even between refreshes
-     * when using certain history contexts, such as BrowserHistory.
-     *
-     * @param key - Optionally get a specific key value from state
-     * @returns {any} - The location state or state key value
-     */
-    getLocationState(key?: string): any {
-        const { location } = this.props;
-        const { state: locationState = {} } = location;
-        return getProp(locationState, key);
-    }
 
     /**
      * Getter/setter for sidebar forced state
@@ -300,13 +288,13 @@ class SidebarRouterDisabled extends React.Component<Props, State> {
     }
 
     /**
-     * Helper to set the local store open state based on the location open state, if defined
+     * Helper to set the local store open state based on the navigation open state, if defined
      */
     setForcedByLocation(): void {
-        const isLocationOpen: ?boolean = this.getLocationState('open');
+        const isNavigationOpen: ?boolean = this.state.internalSidebarNavigation.open;
 
-        if (isLocationOpen !== undefined && isLocationOpen !== null) {
-            this.isForced(isLocationOpen);
+        if (isNavigationOpen !== undefined && isNavigationOpen !== null) {
+            this.isForced(isNavigationOpen);
         }
     }
 
@@ -745,11 +733,8 @@ class SidebarRouterEnabled extends React.Component<Props, State> {
     }
 }
 
-// Export the router-enabled component with router HOC
-const SidebarRouterEnabledWithHOC = flow([withCurrentUser, withFeatureConsumer, withRouterIfEnabled])(SidebarRouterEnabled);
-
-// Export the feature-flagged component with HOCs (but no router for the wrapper)
-const SidebarWithHOCs = flow([withCurrentUser, withFeatureConsumer])((props: Props) => {
+// Feature-flagged component
+const Sidebar = (props: Props) => {
     const { features } = props;
     const isRouterDisabled = isFeatureEnabled(features, 'contentSidebar.routerDisabled');
     
@@ -757,12 +742,11 @@ const SidebarWithHOCs = flow([withCurrentUser, withFeatureConsumer])((props: Pro
         return <SidebarRouterDisabled {...props} />;
     }
     
-    // For router-enabled version, we need to use the version with router HOC
-    return <SidebarRouterEnabledWithHOC {...props} />;
-});
+    return <SidebarRouterEnabled {...props} />;
+};
 
 // Named exports for direct access (useful for testing)
 export { SidebarRouterDisabled, SidebarRouterEnabled as SidebarComponent };
 
-// Default export is the feature-flagged version
-export default SidebarWithHOCs;
+// Default export with HOCs applied
+export default flow([withCurrentUser, withFeatureConsumer, withRouterIfEnabled])(Sidebar);
