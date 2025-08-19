@@ -41,17 +41,15 @@ type ActivityCommentsSidebarView = {
 export type SidebarNavigation =
     | {
           sidebar?: ViewType;
+          silent?: boolean;
+          open?: boolean;
       }
     | VersionSidebarView
     | MetadataSidebarView
     | ActivityCommentsSidebarView
     | ActivityAnnotationsSidebarView;
 
-export type InternalSidebarNavigation = SidebarNavigation & {
-    open?: boolean;
-    silent?: boolean;
-};
+export type InternalSidebarNavigation = SidebarNavigation;
 
 export type SidebarNavigationHandler = (sidebar: SidebarNavigation, replace?: boolean) => void;
-
-export type InternalSidebarNavigationHandler = (sidebar: InternalSidebarNavigation, replace?: boolean) => void;
+export type InternalSidebarNavigationHandler = SidebarNavigationHandler;

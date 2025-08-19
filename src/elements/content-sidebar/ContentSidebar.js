@@ -44,6 +44,7 @@ import type { FeatureConfig } from '../common/feature-checking';
 // $FlowFixMe TypeScript file
 import type { Theme } from '../common/theming';
 import type APICache from '../../utils/Cache';
+import type { SidebarNavigation, SidebarNavigationHandler } from '../common/types/SidebarNavigation';
 
 import '../common/fonts.scss';
 import '../common/base.scss';
@@ -87,6 +88,8 @@ type Props = {
     responseInterceptor?: Function,
     sharedLink?: string,
     sharedLinkPassword?: string,
+    sidebarNavigation?: SidebarNavigation,
+    sidebarNavigationHandler?: SidebarNavigationHandler,
     theme?: Theme,
     signSidebarProps: SignSidebarProps,
     token: Token,
@@ -369,6 +372,8 @@ class ContentSidebar extends React.Component<Props, State> {
             onPanelChange,
             onVersionChange,
             onVersionHistoryClick,
+            sidebarNavigation,
+            sidebarNavigationHandler,
             signSidebarProps,
             theme,
             versionsSidebarProps,
@@ -412,6 +417,8 @@ class ContentSidebar extends React.Component<Props, State> {
                                 onPanelChange={onPanelChange}
                                 onVersionChange={onVersionChange}
                                 onVersionHistoryClick={onVersionHistoryClick}
+                                sidebarNavigation={sidebarNavigation || {}}
+                                sidebarNavigationHandler={sidebarNavigationHandler}
                                 signSidebarProps={signSidebarProps}
                                 theme={theme}
                                 versionsSidebarProps={versionsSidebarProps}

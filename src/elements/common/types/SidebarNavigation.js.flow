@@ -28,15 +28,12 @@ export type SidebarNavigation = {
     activeFeedEntryId?: string,
     fileVersionId?: string,
     filteredTemplateIds?: string[],
+    open?: boolean;
     sidebar?: ViewTypeValues,
+    silent?: boolean,
     versionId?: string,
 };
 
-export type InternalSidebarNavigation = SidebarNavigation & {
-    open?: boolean,
-    silent?: boolean,
-};
-
+export type InternalSidebarNavigation = SidebarNavigation &;
 export type SidebarNavigationHandler = (sidebar: SidebarNavigation, replace?: boolean) => void;
-
-export type InternalSidebarNavigationHandler = (sidebar: InternalSidebarNavigation, replace?: boolean) => void;
+export type InternalSidebarNavigationHandler = SidebarNavigationHandler;

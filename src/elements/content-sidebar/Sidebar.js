@@ -39,13 +39,12 @@ import type { Errors } from '../common/flowTypes';
 import type { Theme } from '../common/theming';
 import { SIDEBAR_VIEW_DOCGEN } from '../../constants';
 import API from '../../api';
+import { ViewType, FeedEntryType } from '../common/types/SidebarNavigation';
 import type { 
     InternalSidebarNavigation, 
     InternalSidebarNavigationHandler,
     SidebarNavigation,
     SidebarNavigationHandler,
-    ViewType,
-    FeedEntryType,
 } from '../common/types/SidebarNavigation';
 
 type Props = {
@@ -121,9 +120,11 @@ class SidebarRouterDisabled extends React.Component<Props, State> {
     constructor(props: Props) {
         super(props);
 
+        const { sidebarNavigation } = props;
+
         this.state = {
             isDirty: false,
-            internalSidebarNavigation: {},
+            internalSidebarNavigation: sidebarNavigation || {},
         };
 
         this.setForcedByLocation();
@@ -144,29 +145,30 @@ class SidebarRouterDisabled extends React.Component<Props, State> {
         onOpenChange(this.isOpen(), true);
     }
 
-    componentDidUpdate(prevProps: Props): void {
+    componentDidUpdate(prevProps: Props, prevState: State): void {
         const { fileId, onOpenChange = noop, sidebarNavigation }: Props = this.props;
         const { fileId: prevFileId, sidebarNavigation: prevSidebarNavigation }: Props = prevProps;
         const { isDirty }: State = this.state;
+        let { internalSidebarNavigation } = this.state;
+        const { internalSidebarNavigation: prevInternalSidebarNavigation } = prevState;
 
         // If sidebarNavigation prop changed, update internal state
         if (sidebarNavigation && !isEqual(prevSidebarNavigation, sidebarNavigation)) {
             this.setState({ internalSidebarNavigation: sidebarNavigation });
+            internalSidebarNavigation = sidebarNavigation;
         }
 
         // User navigated to a different file without ever navigating the sidebar
         if (!isDirty && fileId !== prevFileId && this.state.internalSidebarNavigation.sidebar) {
-            this.internalSidebarNavigationHandler({ silent: true });
+            this.internalSidebarNavigationHandler({ silent: true }, true);
         }
 
         // User navigated or toggled the sidebar intentionally, internally or externally
-        const prevInternalNavigation = prevSidebarNavigation || {};
-        const currentInternalNavigation = this.state.internalSidebarNavigation;
-        if (!isEqual(currentInternalNavigation, prevInternalNavigation) && !currentInternalNavigation.silent) {
+        if (!isEqual(internalSidebarNavigation, prevInternalSidebarNavigation) && !internalSidebarNavigation.silent) {
             this.setForcedByLocation();
             this.setState({ isDirty: true });
-            const openState = currentInternalNavigation.open;
-            const prevOpenState = prevInternalNavigation.open;
+            const openState = internalSidebarNavigation.open;
+            const prevOpenState = prevInternalSidebarNavigation.open;
             // Check if the sidebar was expanded / collapsed
             if (prevOpenState !== openState) {
                 onOpenChange(openState, false);
@@ -185,8 +187,7 @@ class SidebarRouterDisabled extends React.Component<Props, State> {
             
             // Call external handler if provided, with only SidebarNavigation properties (excluding internal-only properties)
             if (this.props.sidebarNavigationHandler) {
-                const { open, silent, ...sidebarNavigation } = newNavigation;
-                this.props.sidebarNavigationHandler(sidebarNavigation, replace);
+                this.props.sidebarNavigationHandler(newNavigation, replace);
             }
         }
     };
@@ -292,7 +293,6 @@ class SidebarRouterDisabled extends React.Component<Props, State> {
      */
     setForcedByLocation(): void {
         const isNavigationOpen: ?boolean = this.state.internalSidebarNavigation.open;
-
         if (isNavigationOpen !== undefined && isNavigationOpen !== null) {
             this.isForced(isNavigationOpen);
         }
